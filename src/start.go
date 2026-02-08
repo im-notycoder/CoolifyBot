@@ -2,53 +2,65 @@ package src
 
 import (
 	"fmt"
-	"github.com/PaulSonOfLars/gotgbot/v2"
-	"github.com/PaulSonOfLars/gotgbot/v2/ext"
-	"html"
+	"runtime"
 	"time"
+
+	"github.com/AshokShau/gotdbot"
+	"github.com/AshokShau/gotdbot/ext"
 )
 
-func startHandler(b *gotgbot.Bot, ctx *ext.Context) error {
+func startHandler(ctx *ext.Context) error {
 	msg := ctx.EffectiveMessage
-	startText := fmt.Sprintf(
-		`👋 Hello <b>%s</b>!
+	c := ctx.Client
 
-Welcome to <b>CoolifyBot</b> — your assistant to manage Coolify projects.
+	response := fmt.Sprintf(`
+Welcome to <b>%s</b> — your assistant to manage Coolify projects.
+`, c.Me().FirstName)
 
-Use the menu below to get started.`,
-		html.EscapeString(ctx.EffectiveUser.FirstName),
-	)
-
-	startMarkup := gotgbot.InlineKeyboardMarkup{
-		InlineKeyboard: [][]gotgbot.InlineKeyboardButton{
+	kb := &gotdbot.ReplyMarkupInlineKeyboard{
+		Rows: [][]gotdbot.InlineKeyboardButton{
 			{
-				{Text: "📋 List Projects", CallbackData: "list_projects"},
+				{
+					Text: "📋 List Projects",
+					TypeField: &gotdbot.InlineKeyboardButtonTypeCallback{
+						Data: []byte("list_projects"),
+					},
+				},
+				{
+					Text: "💫 Fᴀʟʟᴇɴ Pʀᴏᴊᴇᴄᴛꜱ",
+					TypeField: &gotdbot.InlineKeyboardButtonTypeUrl{
+						Url: "https://t.me/FallenProjects",
+					},
+				},
 			},
 			{
-				{Text: "🆘 Support Chat", Url: "https://t.me/GuardxSupport"},
-				{Text: "📣 Updates", Url: "https://t.me/FallenProjects"},
+				{
+					Text: "🛠 Sᴏᴜʀᴄᴇ Cᴏᴅᴇ",
+					TypeField: &gotdbot.InlineKeyboardButtonTypeUrl{
+						Url: "https://github.com/AshokShau/coolify-telegram-bot",
+					},
+				},
 			},
 		},
 	}
 
-	opts := &gotgbot.SendMessageOpts{
-		ParseMode:          "HTML",
-		ReplyMarkup:        startMarkup,
-		LinkPreviewOptions: &gotgbot.LinkPreviewOptions{IsDisabled: true},
+	_, err := msg.ReplyText(c, response, &gotdbot.SendTextMessageOpts{ParseMode: "HTML", ReplyMarkup: kb})
+	if err != nil {
+		return fmt.Errorf("failed to send start message: %w", err)
 	}
-
-	if _, err := msg.Reply(b, startText, opts); err != nil {
-		return err
-	}
-
-	return ext.EndGroups
+	return nil
 }
 
-func PingCommandHandler(b *gotgbot.Bot, ctx *ext.Context) error {
+func pingHandler(ctx *ext.Context) error {
+	msg := ctx.EffectiveMessage
+	c := ctx.Client
+
 	start := time.Now()
-	msg, err := ctx.EffectiveMessage.Reply(b, "🏓 Pinging...", nil)
+	updateLag := time.Since(time.Unix(int64(msg.Date), 0)).Milliseconds()
+
+	msg, err := msg.ReplyText(c, "⏱️ Pinging...", nil)
 	if err != nil {
-		return fmt.Errorf("ping: failed to send initial message: %w", err)
+		return fmt.Errorf("failed to send ping message: %w", err)
 	}
 
 	latency := time.Since(start).Milliseconds()
@@ -57,15 +69,15 @@ func PingCommandHandler(b *gotgbot.Bot, ctx *ext.Context) error {
 	response := fmt.Sprintf(
 		"<b>📊 System Performance Metrics</b>\n\n"+
 			"⏱️ <b>Bot Latency:</b> <code>%d ms</code>\n"+
-			"🕒 <b>Uptime:</b> <code>%s</code>\n",
-		latency, uptime,
+			"🕒 <b>Uptime:</b> <code>%s</code>\n"+
+			"📩 <b>Update Lag:</b> <code>%d ms</code>\n"+
+			"⚙️ <b>Go Routines:</b> <code>%d</code>\n",
+		latency, uptime, updateLag, runtime.NumGoroutine(),
 	)
 
-	_, _, err = msg.EditText(b, response, &gotgbot.EditMessageTextOpts{
-		ParseMode: "HTML",
-	})
+	_, err = msg.EditText(c, response, &gotdbot.EditTextMessageOpts{ParseMode: "HTML"})
 	if err != nil {
-		return fmt.Errorf("ping: failed to edit message: %w", err)
+		return fmt.Errorf("failed to edit ping message: %w", err)
 	}
 	return nil
 }
