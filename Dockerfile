@@ -1,23 +1,26 @@
-FROM golang:1.24.4-alpine3.22 AS builder
+FROM golang:1.25 AS builder
 
 WORKDIR /app
-RUN apk add --no-cache git
 
 COPY go.mod go.sum ./
 RUN go mod download
 
-COPY src ./src
+COPY . .
 
-# 🔥 DO NOT FORCE ARCH
-RUN go build -ldflags="-w -s" -o myapp ./src
+RUN go generate
 
-# ---- Runtime image ----
-FROM alpine:3.20.2
+RUN CGO_ENABLED=0 GOOS=linux go build -o bot main.go
 
-RUN apk add --no-cache ca-certificates
+FROM debian:bookworm-slim
 
-WORKDIR /
-COPY --from=builder /app/myapp /myapp
-RUN chmod +x /myapp
+WORKDIR /app
 
-ENTRYPOINT ["/myapp"]
+RUN apt-get update && apt-get install -y \
+    ca-certificates \
+    zlib1g \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY --from=builder /app/bot .
+COPY --from=builder /app/libtdjson.so.* ./
+
+CMD ["./bot"]
