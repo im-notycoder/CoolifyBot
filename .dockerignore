@@ -1,4 +1,4 @@
 **
-!go.mod
-!go.sum
-!src/**
+!go.*
+!*.go
+!src
