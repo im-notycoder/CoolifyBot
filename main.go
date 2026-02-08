@@ -1,91 +1,56 @@
 package main
 
+//go:generate go run github.com/AshokShau/gotdbot/scripts/tools@latest
+
 import (
 	"coolifymanager/src"
 	"coolifymanager/src/config"
-	"fmt"
 	"log"
-	"time"
+	"strconv"
 
-	"github.com/PaulSonOfLars/gotgbot/v2"
-	"github.com/PaulSonOfLars/gotgbot/v2/ext"
+	"github.com/AshokShau/gotdbot"
+	"github.com/AshokShau/gotdbot/ext"
 )
 
-var allowedUpdates = []string{"message", "callback_query"}
-
 func main() {
-	if err := config.Init(); err != nil {
+	if err := config.InitConfig(); err != nil {
 		log.Fatalf("❌ Failed to initialize config: %v", err)
 	}
 
-	bot, err := initBot()
+	apiID, err := strconv.Atoi(config.ApiId)
 	if err != nil {
-		log.Fatalf("❌ Failed to create bot: %v", err)
+		log.Fatalf("❌ Invalid API_ID: %v", err)
 	}
 
-	updater := ext.NewUpdater(src.Dispatcher, nil)
-
-	if config.WebhookUrl != "" {
-		log.Println("🌐 Starting bot in Webhook mode...")
-		if err := startWebhookBot(updater, bot, config.WebhookUrl, "super-secret-token"); err != nil {
-			log.Fatalf("❌ Webhook init failed: %v", err)
-		}
-	} else {
-		log.Println("📡 Starting bot in Long Polling mode...")
-		if err := startLongPollingBot(updater, bot); err != nil {
-			log.Fatalf("❌ Polling init failed: %v", err)
-		}
+	tdlibLibraryPath := config.TdlibLibraryPath
+	if tdlibLibraryPath == "" {
+		tdlibLibraryPath = "./libtdjson.so.1.8.60"
 	}
 
-	log.Printf("🤖 Bot @%s is now running...\n", bot.User.Username)
-	updater.Idle()
-}
+	bot := gotdbot.NewClient(int32(apiID), config.ApiHash, config.Token, &gotdbot.ClientConfig{LibraryPath: "./libtdjson.so.1.8.60"})
 
-func initBot() (*gotgbot.Bot, error) {
-	bot, err := gotgbot.NewBot(config.Token, nil)
+	// gotdbot.SetTdlibLogStreamFile("tdlib.log", 10*1024*1024, false)
+	// disable tdlib logging
+	gotdbot.SetTdlibLogStreamEmpty()
+
+	dispatcher := ext.NewDispatcher(bot)
+
+	err = src.InitFunc(dispatcher)
 	if err != nil {
-		return nil, fmt.Errorf("could not initialize bot: %w", err)
-	}
-	return bot, nil
-}
-
-func startLongPollingBot(updater *ext.Updater, bot *gotgbot.Bot) error {
-	return updater.StartPolling(bot, &ext.PollingOpts{
-		DropPendingUpdates: true,
-		GetUpdatesOpts: &gotgbot.GetUpdatesOpts{
-			Timeout:        9,
-			AllowedUpdates: allowedUpdates,
-			RequestOpts: &gotgbot.RequestOpts{
-				Timeout: 10 * time.Second,
-			},
-		},
-	})
-}
-
-func startWebhookBot(updater *ext.Updater, bot *gotgbot.Bot, domain, webhookSecret string) error {
-	opts := ext.WebhookOpts{
-		ListenAddr:  "0.0.0.0:" + config.Port,
-		SecretToken: webhookSecret,
+		panic(err.Error())
 	}
 
-	if err := updater.StartServer(opts); err != nil {
-		return fmt.Errorf("failed to start webhook server: %w", err)
+	dispatcher.Start()
+	if err = bot.Start(); err != nil {
+		panic(err.Error())
 	}
 
-	if err := updater.AddWebhook(bot, bot.Token, &ext.AddWebhookOpts{
-		SecretToken: webhookSecret,
-	}); err != nil {
-		return fmt.Errorf("failed to add webhook: %w", err)
+	me := bot.Me()
+	username := ""
+	if me.Usernames != nil && len(me.Usernames.ActiveUsernames) > 0 {
+		username = me.Usernames.ActiveUsernames[0]
 	}
 
-	if err := updater.SetAllBotWebhooks(domain, &gotgbot.SetWebhookOpts{
-		MaxConnections:     100,
-		AllowedUpdates:     allowedUpdates,
-		DropPendingUpdates: true,
-		SecretToken:        webhookSecret,
-	}); err != nil {
-		return fmt.Errorf("failed to set webhook: %w", err)
-	}
-
-	return nil
+	bot.Logger.Info("✅ Bot started as @" + username)
+	bot.Idle()
 }
