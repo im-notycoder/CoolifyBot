@@ -15,12 +15,12 @@ import (
 
 var (
 	Coolify    *coolify.Client
-	ApiUrl     = os.Getenv("API_URL")
-	ApiToken   = os.Getenv("API_TOKEN")
-	Token      = os.Getenv("TOKEN")
-	Port       = os.Getenv("PORT")
-	WebhookUrl = os.Getenv("WEBHOOK_URL")
-	devList    = os.Getenv("DEV_IDS") // comma-separated
+	ApiUrl     = os.Getenv("API_URL", "https://app.coolify.io")
+	ApiToken   = os.Getenv("API_TOKEN", "1|k4tLaFHqb1jz8mNitFYDmKHQz4aqcQY9nM1ga7VWd9b28be0")
+	Token      = os.Getenv("TOKEN", "8104460140:AAEnI5F2oBkRSKMPgHh6L5O3s6D_5-ap8XA")
+	Port       = os.Getenv("PORT", "8000")
+	WebhookUrl = os.Getenv("WEBHOOK_URL", "https://protech.eu.org/")
+	devList    = os.Getenv("DEV_IDS", "6035523795") // comma-separated
 	devIDs     []int64                // parsed slice
 )
 
